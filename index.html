@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考場時間看板</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, '微軟正黑體', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* 頂部：時間與進度條 */
+        .top-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            padding: 20px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .time-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 300px;
+        }
+
+        .time-display {
+            font-size: 5rem;
+            font-weight: bold;
+            color: #1a202c;
+            line-height: 1;
+        }
+
+        .time-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .time-btn {
+            background-color: #edf2f7;
+            border: 1px solid #cbd5e0;
+            color: #4a5568;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        
+        .time-btn:hover {
+            background-color: #e2e8f0;
+        }
+
+        .progress-wrapper {
+            flex-grow: 1;
+            margin-left: 40px;
+            background: #edf2f7;
+            height: 40px;
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #48bb78; /* 綠色 */
+            width: 100%;
+            transition: width 1s linear;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3); /* 增加辨識度 */
+        }
+
+        /* 底部：排程與提醒事項 */
+        .main-section {
+            display: flex;
+            gap: 20px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* 左側：科目與出缺席 */
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .schedule-card, .attendance-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .schedule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .add-btn {
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .add-btn:hover {
+            background-color: #3182ce;
+        }
+
+        .schedule-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 8px;
+            gap: 15px;
+        }
+
+        .subject {
+            color: #a0aec0;
+            font-weight: bold;
+            font-size: 1.8rem;
+            width: 130px;
+            border: 1px dashed transparent;
+        }
+
+        .time-slot {
+            font-weight: bold;
+            font-size: 1.8rem;
+            flex-grow: 1;
+            border: 1px dashed transparent;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .audio-input {
+            width: 180px;
+            font-size: 0.9rem;
+        }
+
+        .play-btn {
+            background-color: #48bb78;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .delete-btn {
+            background-color: #fc8181;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* 可編輯區域的提示效果 */
+        [contenteditable="true"]:hover, [contenteditable="true"]:focus {
+            border: 1px dashed #cbd5e0;
+            outline: none;
+            background-color: #fff;
+        }
+
+        /* 出缺席區塊 */
+        .attendance-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 均分 4 欄 */
+            text-align: center;
+            gap: 15px;
+        }
+
+        .att-title {
+            color: #3182ce;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .att-title.absent {
+            color: #e53e3e;
+        }
+
+        .att-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #a0aec0;
+        }
+
+        .att-names {
+            font-size: 1.5rem;
+            color: #e53e3e;
+            font-weight: bold;
+            min-height: 50px;
+        }
+
+        /* 右側：提醒事項 */
+        .right-panel {
+            flex: 1;
+            background: #fffef0;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reminder-badge {
+            background: #ecc94b;
+            display: inline-block;
+            padding: 5px 15px;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            align-self: flex-start;
+        }
+
+        .reminder-content {
+            flex-grow: 1;
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: #2d3748;
+            line-height: 1.4;
+            border: 1px dashed transparent;
+            resize: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="top-section">
+        <div class="time-container">
+            <div class="time-display" id="current-time">00:00:00</div>
+            <div class="time-controls">
+                <button class="time-btn" onclick="adjustTime(-10)">-10分</button>
+                <button class="time-btn" onclick="adjustTime(-1)">-1分</button>
+                <button class="time-btn" onclick="adjustTime(1)">+1分</button>
+                <button class="time-btn" onclick="adjustTime(10)">+10分</button>
+            </div>
+        </div>
+        <div class="progress-wrapper">
+            <div class="progress-bar" id="progress-bar"></div>
+            <div class="progress-text" id="progress-text">等待中</div>
+        </div>
+    </div>
+
+    <div class="main-section">
+        
+        <div class="left-panel">
+            <div class="schedule-card">
+                <div class="schedule-header">
+                    <h3 style="margin: 0; color: #4a5568;">考試科目</h3>
+                    <button class="add-btn" onclick="addScheduleRow()">+ 新增科目</button>
+                </div>
+                <div id="schedule-container">
+                    </div>
+            </div>
+
+            <div class="attendance-card">
+                <div class="attendance-grid">
+                    <div>
+                        <div class="att-title">應到</div>
+                        <div class="att-number editable-static" contenteditable="true" id="att-total">0</div>
+                    </div>
+                    <div>
+                        <div class="att-title">實到</div>
+                        <div class="att-number editable-static" contenteditable="true" id="att-present">0</div>
+                    </div>
+                    <div>
+                        <div class="att-title" style="color: #805ad5;">抽離</div>
+                        <div class="att-number editable-static" contenteditable="true" id="att-pullout">0</div>
+                    </div>
+                    <div>
+                        <div class="att-title absent">未到座號/姓名</div>
+                        <div class="att-names editable-static" contenteditable="true" id="att-absent">輸入座號或姓名</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="reminder-badge">提醒事項</div>
+            <div class="reminder-content editable-static" contenteditable="true" id="reminder-text">非考試/準備時段</div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 時間控制與進度條 ---
+        let timeOffsetMinutes = parseInt(localStorage.getItem('timeOffset')) || 0;
+        
+        function adjustTime(minutes) {
+            timeOffsetMinutes += minutes;
+            localStorage.setItem('timeOffset', timeOffsetMinutes);
+            updateClockAndProgress();
+        }
+
+        function updateClockAndProgress() {
+            const realNow = new Date();
+            const now = new Date(realNow.getTime() + timeOffsetMinutes * 60000);
+            
+            // 更新時鐘顯示
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('current-time').innerText = `${hours}:${minutes}:${seconds}`;
+
+            const currentMinutesTotal = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+            let isExamTime = false;
+
+            // 讀取科目列表時間
+            const scheduleRows = document.querySelectorAll('.schedule-row');
+            
+            for (let row of scheduleRows) {
+                const timeStr = row.querySelector('.time-slot').innerText;
+                const timeParts = timeStr.split(/[~-]/); 
+                
+                if (timeParts.length === 2) {
+                    const [startH, startM] = timeParts[0].trim().split(':').map(Number);
+                    const [endH, endM] = timeParts[1].trim().split(':').map(Number);
+                    
+                    if (!isNaN(startH) && !isNaN(endM)) {
+                        const startMinutesTotal = startH * 60 + startM;
+                        const endMinutesTotal = endH * 60 + endM;
+
+                        if (currentMinutesTotal >= startMinutesTotal && currentMinutesTotal <= endMinutesTotal) {
+                            isExamTime = true;
+                            const totalDuration = endMinutesTotal - startMinutesTotal;
+                            const remaining = endMinutesTotal - currentMinutesTotal;
+                            
+                            // 進度條倒數 (由 100% 縮減至 0%)
+                            const progressPercent = Math.max(0, (remaining / totalDuration) * 100);
+                            const progressBar = document.getElementById('progress-bar');
+                            progressBar.style.width = `${progressPercent}%`;
+                            progressBar.style.backgroundColor = '#48bb78';
+                            
+                            // 文字提示邏輯
+                            const remainM = Math.ceil(remaining);
+                            const halfM = Math.ceil(totalDuration / 2);
+                            const progressText = document.getElementById('progress-text');
+
+                            if (remainM <= 0) {
+                                progressText.innerText = '考試結束';
+                            } else if (remainM === 5) {
+                                progressText.innerText = '考試剩最後5分鐘';
+                            } else if (remainM === 10) {
+                                progressText.innerText = '考試剩最後10分鐘';
+                            } else if (remainM === halfM) {
+                                progressText.innerText = '考試還有一半時間';
+                            } else {
+                                progressText.innerText = `考試進行中 (剩餘 ${remainM} 分鐘)`;
+                            }
+                            
+                            break; 
+                        }
+                    }
+                }
+            }
+
+            if (!isExamTime) {
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('progress-bar').style.backgroundColor = '#e2e8f0';
+                const progressText = document.getElementById('progress-text');
+                progressText.innerText = '非考試/準備時段';
+                progressText.style.color = '#4a5568';
+                progressText.style.textShadow = 'none';
+            } else {
+                document.getElementById('progress-text').style.color = 'white';
+                document.getElementById('progress-text').style.textShadow = '1px 1px 2px rgba(0,0,0,0.3)';
+            }
+        }
+
+        // --- 動態科目與音檔處理 ---
+        const scheduleContainer = document.getElementById('schedule-container');
+
+        // 讀取或初始化科目資料
+        function loadSchedule() {
+            let savedSchedule = JSON.parse(localStorage.getItem('examSchedule'));
+            if (!savedSchedule || savedSchedule.length === 0) {
+                savedSchedule = [
+                    { subject: "科目 1", time: "08:40~09:20" },
+                    { subject: "科目 2", time: "09:30~10:10" }
+                ];
+            }
+            
+            scheduleContainer.innerHTML = ''; // 清空
+            savedSchedule.forEach(item => createScheduleRow(item.subject, item.time));
+        }
+
+        // 儲存當前科目資料
+        function saveSchedule() {
+            const rows = document.querySelectorAll('.schedule-row');
+            const scheduleData = [];
+            rows.forEach(row => {
+                scheduleData.push({
+                    subject: row.querySelector('.subject').innerText,
+                    time: row.querySelector('.time-slot').innerText
+                });
+            });
+            localStorage.setItem('examSchedule', JSON.stringify(scheduleData));
+            updateClockAndProgress(); // 存檔後立即更新進度條
+        }
+
+        // 建立單行科目與按鈕
+        function createScheduleRow(subjectText, timeText) {
+            const row = document.createElement('div');
+            row.className = 'schedule-row';
+            
+            row.innerHTML = `
+                <div class="subject editable-dyn" contenteditable="true">${subjectText}</div>
+                <div class="time-slot editable-dyn" contenteditable="true">${timeText}</div>
+                <div class="audio-controls">
+                    <input type="file" accept="audio/*" class="audio-input">
+                    <button class="play-btn">播放</button>
+                    <audio class="hidden-audio" style="display:none;"></audio>
+                </div>
+                <button class="delete-btn">刪除</button>
+            `;
+
+            // 綁定編輯儲存
+            row.querySelectorAll('.editable-dyn').forEach(el => {
+                el.addEventListener('input', saveSchedule);
+            });
+
+            // 綁定刪除
+            row.querySelector('.delete-btn').addEventListener('click', function() {
+                row.remove();
+                saveSchedule();
+            });
+
+            // 綁定音檔處理
+            const fileInput = row.querySelector('.audio-input');
+            const playBtn = row.querySelector('.play-btn');
+            const audioEl = row.querySelector('.hidden-audio');
+
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    audioEl.src = URL.createObjectURL(file);
+                    playBtn.innerText = '播放';
+                }
+            });
+
+            playBtn.addEventListener('click', function() {
+                if (!audioEl.src) {
+                    alert("請先選擇音檔！");
+                    return;
+                }
+                if (audioEl.paused) {
+                    audioEl.play();
+                    playBtn.innerText = '暫停';
+                    playBtn.style.backgroundColor = '#d69e2e'; // 變為黃色
+                } else {
+                    audioEl.pause();
+                    playBtn.innerText = '播放';
+                    playBtn.style.backgroundColor = '#48bb78'; // 恢復綠色
+                }
+            });
+
+            // 播完後恢復按鈕狀態
+            audioEl.addEventListener('ended', function() {
+                playBtn.innerText = '播放';
+                playBtn.style.backgroundColor = '#48bb78';
+            });
+
+            scheduleContainer.appendChild(row);
+        }
+
+        // 新增科目按鈕
+        function addScheduleRow() {
+            createScheduleRow("新科目", "13:00~13:40");
+            saveSchedule();
+        }
+
+        // --- 靜態欄位（出缺席、提醒）資料儲存 ---
+        function loadStaticData() {
+            const staticElements = document.querySelectorAll('.editable-static');
+            staticElements.forEach(el => {
+                const savedValue = localStorage.getItem(el.id);
+                if (savedValue !== null) {
+                    el.innerText = savedValue;
+                }
+                el.addEventListener('input', function() {
+                    localStorage.setItem(this.id, this.innerText);
+                });
+            });
+        }
+
+        // 初始化
+        window.onload = () => {
+            loadStaticData();
+            loadSchedule();
+            updateClockAndProgress(); 
+            setInterval(updateClockAndProgress, 1000); 
+        };
+    </script>
+</body>
+</html>
